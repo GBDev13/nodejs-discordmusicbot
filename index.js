@@ -19,7 +19,8 @@ const servidores = {
     connection: null,
     dispatcher: null,
     queue: [],
-    playing: false
+    playing: false,
+    currentPlaying: 0
   }
 };
 
@@ -64,9 +65,7 @@ client.on("message", async (msg) => {
 
   if(msg.content === prefix + 'skip') {
     servidores.server.playing = false;
-    servidores.server.dispatcher = null;
-    servidores.server.queue.shift();
-    tocaMusicas();
+    proximaMusica();
     return;
   }
 
@@ -102,7 +101,7 @@ client.on("message", async (msg) => {
         servidores.server.queue.push(result.items[i].id);
       };
       msg.channel.send(`**${result.title}** foi adicionada a lista atual!`);
-      tocaMusicas();
+      tocaMusicas(msg);
       return
     }
 
@@ -155,7 +154,7 @@ client.on("message", async (msg) => {
               const reaction = collected.first();
               const selectedOption = reactions.indexOf(reaction.emoji.name);
 
-              msg.channel.send(`Você escolheu **${resultList[selectedOption].videoTitle}** de **${resultList[selectedOption].channelName}**`);
+              msg.channel.send(`**${resultList[selectedOption].videoTitle}** de **${resultList[selectedOption].channelName}** foi adicionado a lista atual!`);
 
               servidores.server.queue.push(resultList[selectedOption].id);
               tocaMusicas();
@@ -178,20 +177,33 @@ client.on("message", async (msg) => {
   }
 });
 
-const tocaMusicas = () => {
+const proximaMusica = (msg) => {
+  if(servidores.server.queue.length > servidores.server.currentPlaying) {
+    servidores.server.currentPlaying = servidores.server.currentPlaying + 1;
+    tocaMusicas(msg);
+  } else {
+    servidores.server.currentPlaying = 0;
+    servidores.server.dispatcher = null;
+  }
+};
+
+const tocaMusicas = (msg) => {
   if(!servidores.server.playing) {
-    const tocando = servidores.server.queue[0];
+    const tocando = servidores.server.queue[servidores.server.currentPlaying];
     servidores.server.playing = true;
     servidores.server.dispatcher = servidores.server.connection.play(ytdl(tocando, ytdlOptions));
-    
+
+    const musicEmbed = new Discord.MessageEmbed()
+    .setColor([64, 175, 255])
+    .setAuthor('Tocando agora')
+    .setTitle(tocando)
+    .setThumbnail('https://i.imgur.com/AfFp7pu.png')
+    .setURL(`https://www.youtube.com/watch?v=${tocando}`);
+    msg.channel.send(musicEmbed);
+
     servidores.server.dispatcher.on('finish', () => {
-      servidores.server.queue.shift();
       servidores.server.playing = false;
-      if(servidores.server.queue.length > 0) {
-        tocaMusicas();
-      } else {
-        servidores.server.dispatcher = null;
-      }
+      proximaMusica(msg);
     });
 
   }
