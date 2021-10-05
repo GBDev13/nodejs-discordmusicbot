@@ -1,6 +1,6 @@
 const Discord = require('discord.js');
 const ytdl = require('ytdl-core');
-const client = new Discord.Client();
+const client = new Discord.Client({ restRequestTimeout: 50000 });
 const google = require('googleapis');
 const ytpl = require('ytpl');
 require('dotenv/config');
@@ -27,14 +27,6 @@ const servidores = {
 const ytdlOptions = {
   filter: 'audioonly'
 };
-
-const getApp = (guildId) => {
-  const app = client.api.applications(client.user.id);
-  if(guildId) {
-    app.guilds(guildId);
-  }
-  return app;
-}
 
 client.on("ready", () => {
   console.log('Estou online!');
@@ -76,7 +68,15 @@ client.on("message", async (msg) => {
   }
   
   if(msg.content === prefix + 'current') {
-    msg.channel.send(`Lista atual: ${servidores.server.queue.length}`);
+    const currentEmbed = new Discord.MessageEmbed()
+    .setColor([64, 175, 255])
+    .setAuthor('Bot dos Moto')
+    .setTitle('Informações sobre a lista atual')
+    .addFields(
+      { name: 'Músicas na lista:', value: servidores.server.queue.length > 0 ? servidores.server.queue.length : 'Nenhuma', inline: true },
+      { name: 'Tocando agora', value: servidores.server.queue.length > 0 ? servidores.server.currentPlaying + 1 : 'Nenhuma', inline: true },
+    )
+    msg.channel.send(currentEmbed);
   }
 
   if(msg.content.startsWith(prefix + 'listpos')) {
@@ -100,8 +100,15 @@ client.on("message", async (msg) => {
     }
   }
 
+
   if(msg.content.startsWith(prefix + 'play')) {
     let oQueTocar = msg.content.slice(6);
+    let playNow = false;
+
+    if(msg.content.startsWith(prefix + 'playnow')) {
+      oQueTocar = msg.content.slice(9);
+      playNow = true;
+    }
 
     if(oQueTocar.length <= 0) {
       msg.channel.send('Eu preciso de algo para tocar!');
@@ -119,6 +126,7 @@ client.on("message", async (msg) => {
 
     if(oQueTocar.includes('playlist')) {
       const result = await ytpl(oQueTocar, { limit: 9999 });
+      let playArray = [];
       for(i in result.items) {
         const current = result.items[i];
         const formatted = {
@@ -126,8 +134,16 @@ client.on("message", async (msg) => {
           title: current.title,
           thumb: current.thumbnails[0].url
         };
-        servidores.server.queue.push(formatted);
+
+        if (playNow && servidores.server.queue.length > 1) {
+          playArray.push(formatted)
+        } else {
+          servidores.server.queue.push(formatted);
+        }
       };
+      if (playNow && servidores.server.queue.length > 1) {
+        playMusicNow(playArray, true);
+      }
       tocaMusicas(msg);
 
       const playlistEmbed = new Discord.MessageEmbed()
@@ -148,13 +164,17 @@ client.on("message", async (msg) => {
         title: info.videoDetails.title,
         thumb: info.videoDetails.thumbnails[0].url
       };
-      servidores.server.queue.push(formatInfo);
+      if (playNow && servidores.server.queue.length > 1) {
+        playMusicNow(formatInfo);
+      } else {
+        servidores.server.queue.push(formatInfo);
+      }
       tocaMusicas(msg);
 
       if(servidores.server.queue.length > 1) {
         const addEmbed = new Discord.MessageEmbed()
         .setColor([64, 175, 255])
-        .setAuthor(`Música foi adicionada a lista (#${servidores.server.queue.length})`)
+        .setAuthor(`Música foi adicionada a lista (#${playNow ? servidores.server.currentPlaying + 1 : servidores.server.queue.length})`)
         .setTitle(formatInfo.title)
         .setThumbnail(formatInfo.thumb)
         .setURL(formatInfo.url);
@@ -207,13 +227,18 @@ client.on("message", async (msg) => {
               const reaction = collected.first();
               const selectedOption = reactions.indexOf(reaction.emoji.name);
 
-              servidores.server.queue.push(resultList[selectedOption]);
+              if (playNow && servidores.server.queue.length > 1) {
+                playMusicNow(resultList[selectedOption]);
+              } else {
+                servidores.server.queue.push(resultList[selectedOption]);
+              }
+
               tocaMusicas(msg);
 
               if(servidores.server.queue.length > 1) {
                 const youAddEmbed = new Discord.MessageEmbed()
                 .setColor([64, 175, 255])
-                .setAuthor(`Música foi adicionada a lista (#${servidores.server.queue.length})`)
+                .setAuthor(`Música foi adicionada a lista (#${playNow ? servidores.server.currentPlaying + 1 : servidores.server.queue.length})`)
                 .setTitle(resultList[selectedOption].title)
                 .setThumbnail(resultList[selectedOption].thumb)
                 .setURL(resultList[selectedOption].url);
@@ -237,6 +262,21 @@ client.on("message", async (msg) => {
     servidores.server.dispatcher.resume();
   }
 });
+
+const playMusicNow = (item, isArray) => {
+  const firstArray = servidores.server.queue.slice(0, servidores.server.currentPlaying + 1);
+  const secondArray = servidores.server.queue.slice(servidores.server.currentPlaying + 1, servidores.server.queue.length + 1);
+  
+  servidores.server.dispatcher = null;
+  servidores.server.playing = false;
+
+  servidores.server.currentPlaying = firstArray.length;
+  if (isArray) {
+    servidores.server.queue = [...firstArray, ...item, ...secondArray];
+  } else {
+    servidores.server.queue = [...firstArray, item, ...secondArray];
+  }
+}
 
 const proximaMusica = (msg) => {
   if(servidores.server.queue.length > servidores.server.currentPlaying + 1) {
