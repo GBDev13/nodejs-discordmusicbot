@@ -5,6 +5,7 @@ Segui um breve tutorial do canal [Joaõ Pimenta](https://www.youtube.com/channel
 
 O bot não está nada "profissional" pois fiz para uso pessoal, mas caso queria usar, segue os comandos que estão disponíveis:
 * play (parametro) - Esse comando toca música no seu canal de voz atual e como parametro, recebe um link do youtube ou algo que sirva de busca para encontar sua música desejada. Se o parametro não for um link, ele usará o mesmo para realizar a busca no youtube e lhe oferece 5 opções de música para serem tocadas. Após todas essas verificações, ele adiciona a música na lista atual. (Se o link do youtube for uma playlist, ele adiciona todas as musicas na lista);
+* playnow (parametro) - Mesmo funcionamento do comando play, porém usando ele, a música irá tocar instantaneamente;
 * skip - Pula para a próxima música;
 * current - Mostra quantas músicas tem na lista atual;
 * stop - Limpa a lista atual, para de tocar música e sai do canal de voz;
